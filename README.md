@@ -1,3 +1,4 @@
+# SE2 HDR
 Space Engineers 2 mod which attempts to implement HDR output to the game.
 
 # Disclaimer
