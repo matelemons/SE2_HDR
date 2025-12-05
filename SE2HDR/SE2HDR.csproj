@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="Lib.Harmony" Version="2.3.3" />
+		<PackageReference Include="Vortice.Direct3D12" Version="3.8.1" />
+		<PackageReference Include="Vortice.DXGI" Version="3.8.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="includes\HDR.hlsli" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Include="Game2.Client">
+			<HintPath>..\..\..\Game2.Client.dll</HintPath>
+		</Reference>
+		<Reference Include="Game2.Game">
+			<HintPath>..\..\..\Game2.Game.dll</HintPath>
+		</Reference>
+		<Reference Include="VRage.Client">
+			<HintPath>..\..\..\VRage.Client.dll</HintPath>
+		</Reference>
+		<Reference Include="VRage.Core">
+			<HintPath>..\..\..\VRage.Core.dll</HintPath>
+		</Reference>
+		<Reference Include="VRage.Render12">
+			<HintPath>..\..\..\VRage.Render12.dll</HintPath>
+		</Reference>
+		<Reference Include="VRage.DCS">
+			<HintPath>..\..\..\VRage.DCS.dll</HintPath>
+		</Reference>
+		<Reference Include="VRage.Library">
+			<HintPath>..\..\..\VRage.Library.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+</Project>
