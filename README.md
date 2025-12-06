@@ -4,7 +4,7 @@ Space Engineers 2 mod which attempts to implement HDR output to the game.
 # Disclaimer
 This is mostly a proof of concept and it's possible that this mod could cause crashes or not work properly. In case you spot reproducible issues caused by this mod, feel free to report them in [Issues](https://github.com/Matusson/SE2_HDR/issues). 
 
-Also, do note that currently the mod does not check for HDR capabilities on your system. I assume that if you're installing this mod, you have an HDR capable display and you have HDR enabled in Windows. You should also be using a recent version of Windows 10/11. 
+Also, do note that currently the mod does not check for HDR capabilities on your system. I assume that if you're installing this mod, you have an HDR capable display and you have HDR enabled in Windows. **You will not see any visual improvements without an HDR display.** You should also be using a recent version of Windows 10/11. 
 Mod last updated for SE2 `2.0.2.33` 
 
 # Installing
