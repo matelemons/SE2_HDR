@@ -1,42 +1,66 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>disable</Nullable>
-  </PropertyGroup>
-	
-	<ItemGroup>
-		<PackageReference Include="Lib.Harmony" Version="2.3.3" />
-		<PackageReference Include="Vortice.Direct3D12" Version="3.8.1" />
-		<PackageReference Include="Vortice.DXGI" Version="3.8.1" />
-	</ItemGroup>
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <Nullable>disable</Nullable>
+        <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
+        <LangVersion>latestmajor</LangVersion>
+    </PropertyGroup>
 
-	<ItemGroup>
-		<EmbeddedResource Include="includes\HDR.hlsli" />
-	</ItemGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <PlatformTarget>x64</PlatformTarget>
+      <DefineConstants>TRACE;DEV_BUILD</DefineConstants>
+    </PropertyGroup>
 
-	<ItemGroup>
-		<Reference Include="Game2.Client">
-			<HintPath>..\..\..\Game2.Client.dll</HintPath>
-		</Reference>
-		<Reference Include="Game2.Game">
-			<HintPath>..\..\..\Game2.Game.dll</HintPath>
-		</Reference>
-		<Reference Include="VRage.Client">
-			<HintPath>..\..\..\VRage.Client.dll</HintPath>
-		</Reference>
-		<Reference Include="VRage.Core">
-			<HintPath>..\..\..\VRage.Core.dll</HintPath>
-		</Reference>
-		<Reference Include="VRage.Render12">
-			<HintPath>..\..\..\VRage.Render12.dll</HintPath>
-		</Reference>
-		<Reference Include="VRage.DCS">
-			<HintPath>..\..\..\VRage.DCS.dll</HintPath>
-		</Reference>
-		<Reference Include="VRage.Library">
-			<HintPath>..\..\..\VRage.Library.dll</HintPath>
-		</Reference>
-	</ItemGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <PlatformTarget>x64</PlatformTarget>
+      <DefineConstants>TRACE;DEV_BUILD</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>SE2HDR</AssemblyName>
+    </PropertyGroup>
+
+    <Target Name="DeployPlugin" AfterTargets="Build">
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(LocalDeploymentDir)" Retries="0" />
+    </Target>
+
+    <ItemGroup>
+      <PackageReference Include="Lib.Harmony" Version="2.4.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="Avalonia.Base"><HintPath>$(Game2)\Avalonia.Base.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Avalonia.Controls"><HintPath>$(Game2)\Avalonia.Controls.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Avalonia.Controls.ColorPicker"><HintPath>$(Game2)\Avalonia.Controls.ColorPicker.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Avalonia.Markup"><HintPath>$(Game2)\Avalonia.Markup.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Avalonia.Markup.Xaml"><HintPath>$(Game2)\Avalonia.Markup.Xaml.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Avalonia.Themes.Fluent"><HintPath>$(Game2)\Avalonia.Themes.Fluent.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Game2.Client"><HintPath>$(Game2)\Game2.Client.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Game2.Game"><HintPath>$(Game2)\Game2.Game.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Game2.Simulation"><HintPath>$(Game2)\Game2.Simulation.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="SharpGen.Runtime"><HintPath>$(Game2)\SharpGen.Runtime.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="SpaceEngineers2"><HintPath>$(Game2)\SpaceEngineers2.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.Client"><HintPath>$(Game2)\VRage.Client.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.Core"><HintPath>$(Game2)\VRage.Core.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.Core.Game"><HintPath>$(Game2)\VRage.Core.Game.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.DCS"><HintPath>$(Game2)\VRage.DCS.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.Game"><HintPath>$(Game2)\VRage.Game.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.Input"><HintPath>$(Game2)\VRage.Input.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.Library"><HintPath>$(Game2)\VRage.Library.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.Render"><HintPath>$(Game2)\VRage.Render.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.Render12"><HintPath>$(Game2)\VRage.Render12.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.UI"><HintPath>$(Game2)\VRage.UI.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="VRage.UI.Shared"><HintPath>$(Game2)\VRage.UI.Shared.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Vortice.DXGI"><HintPath>$(Game2)\Vortice.DXGI.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Vortice.DirectX"><HintPath>$(Game2)\Vortice.DirectX.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Vortice.Direct3D12"><HintPath>$(Game2)\Vortice.Direct3D12.dll</HintPath><Private>false</Private></Reference>
+      <Reference Include="Vortice.Mathematics"><HintPath>$(Game2)\Vortice.Mathematics.dll</HintPath><Private>false</Private></Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include=".run\Modern.run.xml" />
+    </ItemGroup>
+
 </Project>

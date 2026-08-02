@@ -1,170 +1,79 @@
-﻿using HarmonyLib;
-using Keen.VRage.Core.Render;
-using Keen.VRage.Library.Diagnostics;
-using Keen.VRage.Library.Mathematics;
+using HarmonyLib;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
-using Vortice.DXGI;
 
-namespace SE2HDR.Patches
+namespace SE2HDR.Patches;
+
+[HarmonyPatch]
+public static class PsoFormatArrayPatch
 {
-    [HarmonyPatch]
-    public static class PsoFormatArrayPatch
+    // InitializeAsync is an async method, so we need to patch the compiler-generated
+    // state machine's MoveNext rather than the method itself.
+    static MethodBase TargetMethod()
     {
-        static MethodBase TargetMethod()
-        {
-            // For async methods, we need to patch the compiler-generated state machine's MoveNext
-            var spriteRendererType = AccessTools.TypeByName("Keen.VRage.Render12.UIStage.Sprites.SpriteRenderer");
+        var stateMachineType = PatchTargets.Type(PatchTargets.SpriteRenderer)
+                                   .GetNestedTypes(BindingFlags.NonPublic | BindingFlags.Public)
+                                   .FirstOrDefault(t => t.Name.Contains("InitializeAsync"))
+                               ?? throw new InvalidOperationException(
+                                   "SpriteRenderer.InitializeAsync state machine not found");
 
-            var stateMachineType = spriteRendererType.GetNestedTypes(BindingFlags.NonPublic | BindingFlags.Public)
-                .FirstOrDefault(t => t.Name.Contains("InitializeAsync"));
-
-            if (stateMachineType == null)
-            {
-                return null;
-            }
-
-
-            return AccessTools.Method(stateMachineType, "MoveNext");
-        }
-
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var codes = new List<CodeInstruction>(instructions);
-            int patchCount = 0;
-
-            for (int i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode == OpCodes.Ldc_I4_S &&
-                    codes[i].operand is sbyte && (sbyte)codes[i].operand == (sbyte)Plugin.SOURCE_FORMAT)
-                {
-                    codes[i].operand = (sbyte)Plugin.HDR_FORMAT;
-                    patchCount++;
-                }
-            }
-
-            Log.Default.WriteLine($"{Plugin.Name} SpriteRenderer async patch: {patchCount} format references patched");
-            return codes;
-        }
+        return AccessTools.Method(stateMachineType, "MoveNext")
+               ?? throw new InvalidOperationException("SpriteRenderer.InitializeAsync MoveNext not found");
     }
 
-    [HarmonyPatch]
-    public static class ScreenshotConstructorPatch
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
+        FormatTranspiler.ReplaceFormats(instructions, original);
+}
+
+[HarmonyPatch]
+public static class ScreenshotConstructorPatch
+{
+    static MethodBase TargetMethod() =>
+        PatchTargets.Constructor(PatchTargets.ScreenshotsManager,
+            typeof(List<Keen.VRage.Library.Threading.Task>));
+
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
+        FormatTranspiler.ReplaceFormats(instructions, original, limit: 1);
+}
+
+[HarmonyPatch]
+public static class ScreenshotTakePatch
+{
+    // TakeRequestedScreenshots is generic and each instantiation gets its own IL, so both
+    // texture types the game uses have to be patched separately.
+    static IEnumerable<MethodBase> TargetMethods()
     {
-        static MethodBase TargetMethod()
-        {
-            var type = AccessTools.TypeByName("Keen.VRage.Render12.Core.Systems.ScreenshotsManager");
-            return AccessTools.Constructor(type, new Type[] {
-                typeof(List<Keen.VRage.Library.Threading.Task>),
-            });
-        }
+        var method = (MethodInfo)PatchTargets.Method(PatchTargets.ScreenshotsManager, "TakeRequestedScreenshots");
 
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var codes = new List<CodeInstruction>(instructions);
-
-            for (int i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode == OpCodes.Ldc_I4_S &&
-                    codes[i].operand is sbyte && (sbyte)codes[i].operand == (sbyte)Plugin.SOURCE_FORMAT)
-                {
-                    codes[i].operand = (sbyte)Plugin.HDR_FORMAT;
-                    break;
-                }
-            }
-
-            return codes;
-        }
+        return
+        [
+            method.MakeGenericMethod(
+                PatchTargets.Type("Keen.VRage.Render12.Resources.BindableTextures.RenderTargetTexture")),
+            method.MakeGenericMethod(
+                PatchTargets.Type("Keen.VRage.Render12.Resources.BindableTextures.ResizableRWRenderTargetTexture"))
+        ];
     }
 
-    [HarmonyPatch]
-    public static class ScreenshotTakePatch
-    {
-        static IEnumerable<MethodBase> TargetMethods()
-        {
-            var type = AccessTools.TypeByName("Keen.VRage.Render12.Core.Systems.ScreenshotsManager");
-            var method = AccessTools.Method(type, "TakeRequestedScreenshots");
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
+        FormatTranspiler.ReplaceFormats(instructions, original);
+}
 
-            Log.Default.WriteLine(method.ToString());
-            Log.Default.WriteLine(method.ReturnType.ToString());
-            Log.Default.WriteLine(method.ContainsGenericParameters.ToString());
-            Log.Default.WriteLine(method.GetGenericMethodDefinition().ToString());
+[HarmonyPatch]
+public static class SceneDrawConstructorPatch
+{
+    static MethodBase TargetMethod() => PatchTargets.Constructor(PatchTargets.SceneDrawSystem);
 
-            var impl1 = AccessTools.TypeByName("Keen.VRage.Render12.Resources.BindableTextures.RenderTargetTexture");
-            var impl2 = AccessTools.TypeByName("Keen.VRage.Render12.Resources.BindableTextures.ResizableRWRenderTargetTexture");
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
+        FormatTranspiler.ReplaceFormats(instructions, original);
+}
 
-            return [method.MakeGenericMethod(impl1), method.MakeGenericMethod(impl2)];
-        }
+[HarmonyPatch]
+public static class ExecutePostPassesPatch
+{
+    static MethodBase TargetMethod() => PatchTargets.Method(PatchTargets.SceneDrawSystem, "ExecutePostPasses");
 
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var codes = new List<CodeInstruction>(instructions);
-            int patchCount = 0;
-
-            for (int i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode == OpCodes.Ldc_I4_S &&
-                    codes[i].operand is sbyte && (sbyte)codes[i].operand == (sbyte)Plugin.SOURCE_FORMAT)
-                {
-                    codes[i].operand = (sbyte)Plugin.HDR_FORMAT;
-                    patchCount++;
-                }
-            }
-
-            Log.Default.WriteLine($"{Plugin.Name} TakeRequestedScreenshots patch: {patchCount} format references patched");
-            return codes;
-        }
-    }
-    
-    [HarmonyPatch]
-    public static class SceneDrawConstructorPatch
-    {
-        static MethodBase TargetMethod()
-        {
-            var type = AccessTools.TypeByName("Keen.VRage.Render12.Core.Systems.SceneDrawSystem");
-            return AccessTools.Constructor(type);
-        }
-
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var codes = new List<CodeInstruction>(instructions);
-
-            for (int i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode == OpCodes.Ldc_I4_S &&
-                    codes[i].operand is sbyte && (sbyte)codes[i].operand == (sbyte)Plugin.SOURCE_FORMAT)
-                {
-                    codes[i].operand = (sbyte)Plugin.HDR_FORMAT;
-                }
-            }
-
-            return codes;
-        }
-    }
-
-    [HarmonyPatch]
-    public static class ExecutePostPassesPatch
-    {
-        static MethodBase TargetMethod()
-        {
-            var type = AccessTools.TypeByName("Keen.VRage.Render12.Core.Systems.SceneDrawSystem");
-            return AccessTools.Method(type, "ExecutePostPasses");
-        }
-
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var codes = new List<CodeInstruction>(instructions);
-
-            for (int i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode == OpCodes.Ldc_I4_S &&
-                    codes[i].operand is sbyte && ((sbyte)codes[i].operand == (sbyte)Plugin.SOURCE_FORMAT || (sbyte)codes[i].operand == (sbyte)Plugin.SOURCE_FORMAT_UNORM))
-                {
-                    codes[i].operand = (sbyte)Plugin.HDR_FORMAT;
-                }
-            }
-
-            return codes;
-        }
-    }
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
+        FormatTranspiler.ReplaceFormats(instructions, original, includeUnorm: true);
 }

@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup>
+    <!-- Folder containing SpaceEngineers2.exe. -->
+    <SteamAppInstall>$(registry:HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 1133870@InstallLocation)</SteamAppInstall>
+    <SteamAppInstall Condition="'$(SteamAppInstall)' == ''">$(registry:HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 1133870@InstallLocation)</SteamAppInstall>
+
+    <Game2 Condition="'$(Game2)' == '' And '$(SteamAppInstall)' != ''">$(SteamAppInstall)\Game2</Game2>
+    <Game2 Condition="'$(Game2)' == ''">$([System.Environment]::GetFolderPath(SpecialFolder.ProgramFilesX86))\Steam\steamapps\common\SpaceEngineers2\Game2</Game2>
+
+    <!-- Folder containing Pulsar's data -->
+    <Pulsar Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(APPDATA)\Pulsar</Pulsar>
+    <Pulsar Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(HOME)/.config/Pulsar</Pulsar>
+
+    <!-- Local plugin DLL deployment folder -->
+    <LocalDeploymentDir>$(Pulsar)/Modern/Local</LocalDeploymentDir>
+
+    <!-- Plugin version -->
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <Target Name="VerifyGamePath" BeforeTargets="BeforeBuild" Condition="!Exists('$(Game2)')">
+    <Error Text="Space Engineers 2 not found at '$(Game2)'. Set the Game2 property in Directory.Build.props to the folder containing SpaceEngineers2.exe." />
+  </Target>
+</Project>

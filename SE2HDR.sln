@@ -22,4 +22,7 @@ Global
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4518E0A1-2040-4E6A-B15C-9546AFB55DF5}
 	EndGlobalSection
+	GlobalSection(RiderSharedRunConfigurations) = postSolution
+		File = SE2HDR\.run\Modern.run.xml
+	EndGlobalSection
 EndGlobal
