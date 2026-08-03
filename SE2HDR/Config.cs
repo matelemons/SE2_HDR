@@ -21,9 +21,9 @@ public class Config : INotifyPropertyChanged
     [XmlIgnore]
     public readonly string Title = "HDR10 Plugin Settings";
 
-    [Separator("All settings take effect after a game restart!")]
+    [Separator("Enabling or disabling needs a game restart.")]
 
-    [Checkbox(description: "Enable HDR output. Unticking disables the plugin.")]
+    [Checkbox(description: "Enable HDR output. Unticking disables the plugin. Takes effect after a game restart.")]
     public bool Enabled
     {
         get => enabled;

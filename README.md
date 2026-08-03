@@ -26,8 +26,6 @@ Click the plugin's settings button in Pulsar's plugin list:
 | `PeakNits` | 1000 | Peak luminance used in HDR tonemapping. Set it to your display's peak brightness. |
 | `UiNits` | 200 | Luminance for the UI and HUD, also known as "Paper White" brightness. |
 
-**Changes take effect after a game restart.**
-TODO: See if it can be applied immediately using a buffer
 
 
 # Technical details
@@ -36,5 +34,8 @@ The game's rendering pipeline is already mostly in HDR, so the changes required 
 This plugin has two components:
 1. Code patches use Harmony. Most of these patches are around the swapchain methods and a bit of drawing code. Most of them simply swap the requested format to an HDR one.
 2. Shader patches use string substitution on the shader source, applied in memory. The tonemapping shader gets a Rec709 -> Rec2020 conversion and a PQ curve. Multiple UI shaders are also modified, since UI is drawn after tonemapping. This is not ideal, but it does seem to work.
+
+Config values are adjustable at runtime by injecting the extra values to existing buffers. Tonemapping uses an unusued padding int, while Slug shaders get widened by one float4.
+This plugin might not be compatible with other plugins that modify rendering in a similar way.
 
 Note that all rendering and assets are in Rec709 color space, as far as I'm aware. This means it's not possible to (easily) get accurate wide gamut output. You can only get the benefits of 10-bit signal, higher highlight details and the increased brightness range with this plugin. The differences are likely to be most noticeable on a MiniLED display rather than OLED.

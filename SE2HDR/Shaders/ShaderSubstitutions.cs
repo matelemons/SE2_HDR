@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Text;
 using Keen.VRage.Library.Diagnostics;
@@ -20,16 +19,13 @@ internal sealed class ShaderSubstitutions
 {
     private readonly Dictionary<string, List<Substitution>> byFile;
 
-    public ShaderSubstitutions(int peakNits, int uiNits)
+    public ShaderSubstitutions()
     {
-        byFile = BuildSubstitutions(peakNits, uiNits);
+        byFile = BuildSubstitutions();
     }
 
-    private static Dictionary<string, List<Substitution>> BuildSubstitutions(int peakNits, int uiNits)
+    private static Dictionary<string, List<Substitution>> BuildSubstitutions()
     {
-        var peak = peakNits.ToString(CultureInfo.InvariantCulture);
-        var hdr = HdrHlsl.Build(uiNits);
-
         var result = new Dictionary<string, List<Substitution>>(StringComparer.OrdinalIgnoreCase);
 
         // Tonemapping
@@ -37,12 +33,13 @@ internal sealed class ShaderSubstitutions
             new Substitution
             {
                 SearchPattern = "#include <Common/Frame.hlsli>\r\n#include <Common/Random.hlsli>",
-                Replacement = "#include <Common/Frame.hlsli>\r\n#include <Common/Random.hlsli>\r\n" + hdr
+                Replacement = "#include <Common/Frame.hlsli>\r\n#include <Common/Random.hlsli>\r\n"
+                              + HdrHlsl.Common + HdrHlsl.PeakNits
             },
             new Substitution
             {
                 SearchPattern = "    color = SaturateColor(color);\r\n    ColorSRGB colorSRGB = LinearToSRGB(color);\r\n\r\n#ifdef FILL_ALPHA_LUMINANCE\r\n\tfloat alpha = GetRelativeLuminance((ColorLinear) colorSRGB.Values);\r\n\tDestination[texel] = float4(colorSRGB.Values.rgb, alpha);\r\n#else\r\n\tDestination[texel] = float4(colorSRGB.Values.rgb, 1);\r\n#endif",
-                Replacement = "    color = SaturateColor(color);\r\n\r\n    // Color sRGB? that's a lie\r\n    // OVERSATURATED\r\n    // (you can enable this if you want very vivid colors, i suppose)\r\n    //float4 colorSRGB = float4(color.Values.rgb, color.Values.a);\r\n\r\n    // CORRECT\r\n    float4 colorSRGB = float4(REC709toREC2020(color.Values.rgb), color.Values.a);\r\n    \r\n    colorSRGB = float4(ST2084Curve(colorSRGB.rgb, " + peak + "), colorSRGB.a);\r\n\r\n#ifdef FILL_ALPHA_LUMINANCE\r\n\tfloat alpha = GetRelativeLuminance((ColorLinear) colorSRGB);\r\n\tDestination[texel] = float4(colorSRGB.rgb, alpha);\r\n#else\r\n\tDestination[texel] = float4(colorSRGB.rgb, 1);\r\n#endif"
+                Replacement = "    color = SaturateColor(color);\r\n\r\n    // Color sRGB? that's a lie\r\n    // OVERSATURATED\r\n    // (you can enable this if you want very vivid colors, i suppose)\r\n    //float4 colorSRGB = float4(color.Values.rgb, color.Values.a);\r\n\r\n    // CORRECT\r\n    float4 colorSRGB = float4(REC709toREC2020(color.Values.rgb), color.Values.a);\r\n    \r\n    colorSRGB = float4(ST2084Curve(colorSRGB.rgb, SE2HDR_PeakNits()), colorSRGB.a);\r\n\r\n#ifdef FILL_ALPHA_LUMINANCE\r\n\tfloat alpha = GetRelativeLuminance((ColorLinear) colorSRGB);\r\n\tDestination[texel] = float4(colorSRGB.rgb, alpha);\r\n#else\r\n\tDestination[texel] = float4(colorSRGB.rgb, 1);\r\n#endif"
             });
 
         // UI
@@ -57,26 +54,37 @@ internal sealed class ShaderSubstitutions
                 new Substitution
                 {
                     SearchPattern = "// @define SHADER_ASSERTS_ENABLED",
-                    Replacement = "// @define SHADER_ASSERTS_ENABLED\r\n" + hdr
+                    Replacement = "// @define SHADER_ASSERTS_ENABLED\r\n"
+                                  + HdrHlsl.Common + HdrHlsl.SlugUiNits
                 },
                 new Substitution
                 {
                     SearchPattern = "\t#endif\r\n\r\n\t#if defined(SLUG_COVERAGE)",
-                    Replacement = "\t#endif\r\n\r\n\tcolor = ToHdr(color);\r\n\r\n\t#if defined(SLUG_COVERAGE)"
+                    Replacement = "\t#endif\r\n\r\n\tcolor = ToHdr(color, SE2HDR_UiNits());\r\n\r\n\t#if defined(SLUG_COVERAGE)"
                 });
         }
 
         // Sprites
+        // The pixel constants are shared with the vertex shader, which never binds them. DXC
+        // strips the unused declaration there, so widening the struct only affects the pixel side.
+        Add(result, "Primitives/SpritesShared.hlsli",
+            new Substitution
+            {
+                SearchPattern = "struct PixelBufferConstants\r\n{\r\n    uint TextureIndex;\r\n    uint MaskTextureIndex;\r\n};",
+                Replacement = "struct PixelBufferConstants\r\n{\r\n    uint TextureIndex;\r\n    uint MaskTextureIndex;\r\n    float SE2HDR_UiNits;\r\n    float SE2HDR_Reserved;\r\n};"
+            });
+
         Add(result, "Primitives/SpritesPixel.hlsl",
             new Substitution
             {
                 SearchPattern = "#include <Common/Resources/Managed.hlsli>",
-                Replacement = "#include <Common/Resources/Managed.hlsli>\r\n" + hdr
+                Replacement = "#include <Common/Resources/Managed.hlsli>\r\n" + HdrHlsl.Common
             },
             new Substitution
             {
                 SearchPattern = "    output = (ColorLinearPremultiplied)(sample.Values * input.Color.Values * mask);",
-                Replacement = "    output = (ColorLinearPremultiplied)(ToHdr(sample.Values * input.Color.Values * mask));"
+                Replacement = "    output = (ColorLinearPremultiplied)(ToHdr(sample.Values * input.Color.Values * mask, "
+                              + HdrHlsl.SpriteUiNits + "));"
             });
 
         // Bilinear upscaling

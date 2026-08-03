@@ -48,7 +48,7 @@ public class Plugin : IPlugin
         }
 
         // Confirm the shader edits will apply before touching anything.
-        var substitutions = new ShaderSubstitutions(Config.Current.PeakNits, Config.Current.UiNits);
+        var substitutions = new ShaderSubstitutions();
         if (!substitutions.Validate())
         {
             Log.Default.WriteLine(LogSeverity.Error,
