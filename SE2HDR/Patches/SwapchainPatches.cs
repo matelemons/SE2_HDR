@@ -18,7 +18,7 @@ public static class SwapchainPatch
     static MethodBase TargetMethod() => PatchTargets.Method(PatchTargets.SwapChain, "CreateD3DSwapChain");
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original, limit: 1);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
 
     static void Postfix(ref IDXGISwapChain3 __result)
     {
@@ -68,7 +68,7 @@ public static class SwapchainResizePatch
         PatchTargets.Method(PatchTargets.SwapChain, "Resize", typeof(Vector2I));
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
 }
 
 [HarmonyPatch]
@@ -80,7 +80,7 @@ public static class SwapchainInitializeBackBufferPatch
         PatchTargets.Method(PatchTargets.SwapChain, "InitializeBackBufferWrappers");
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
 }
 
 [HarmonyPatch]
@@ -94,7 +94,7 @@ public static class SwapchainConstructorPatch
             PatchTargets.Type("Keen.VRage.Core.Platform.IPlatformWindows"));
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
 }
 
 // Previously, SwapChain.Update was also patched. This is not done anymore as

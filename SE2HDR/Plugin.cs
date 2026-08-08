@@ -13,7 +13,7 @@ namespace SE2HDR;
 
 public class Plugin : IPlugin
 {
-    public const string Name = "HDR10";
+    public const string Name = "Tonemap+HDR";
 
     public const Format SOURCE_FORMAT = Format.R8G8B8A8_UNorm_SRgb;
     public const Format SOURCE_FORMAT_UNORM = Format.R8G8B8A8_UNorm;
@@ -80,9 +80,11 @@ public class Plugin : IPlugin
             Log.Default.WriteLine(LogSeverity.Error, $"[{Name}] Patching failed, reverting. {ex}");
             harmony.UnpatchAll(Name);
             Substitutions = null;
+
+            var cause = ex.GetBaseException();
             FailureNotice.Queue(
                 "Applying the render patches failed, and the plugin has been disabled:\n\n" +
-                $"{ex.GetType().Name}: {ex.Message}\n\n" +
+                $"{cause.GetType().Name}: {cause.Message}\n\n" +
                 $"This is likely due to a game update. Please inform the {Name} plugin developer on GitHub.\n\n" +
                 "Disable the plugin to stop showing this message.");
             return;

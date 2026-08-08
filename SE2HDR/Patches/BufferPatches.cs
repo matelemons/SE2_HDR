@@ -13,7 +13,7 @@ public static class BufferInitializePatch
     static MethodBase TargetMethod() => PatchTargets.Method(PatchTargets.ScreenBuffers, "InitializeBuffers");
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 2);
 }
 
 [HarmonyPatch]
@@ -24,5 +24,5 @@ public static class BufferPlaceholderPatch
     static MethodBase TargetMethod() => PatchTargets.Method(PatchTargets.ScreenBuffers, "CreateBackbufferPlaceholder");
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 2);
 }

@@ -73,7 +73,7 @@ public class Config : INotifyPropertyChanged
     #region User interface
 
     [XmlIgnore]
-    public readonly string Title = "HDR10 Plugin Settings";
+    public readonly string Title = "Tonemapping + HDR Plugin Settings";
 
     [Separator("Display")]
 

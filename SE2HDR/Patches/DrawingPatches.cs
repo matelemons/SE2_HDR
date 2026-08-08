@@ -27,7 +27,7 @@ public static class PsoFormatArrayPatch
     }
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
 }
 
 [HarmonyPatch]
@@ -40,7 +40,7 @@ public static class ScreenshotConstructorPatch
             typeof(List<Keen.VRage.Library.Threading.Task>));
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original, limit: 1);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
 }
 
 [HarmonyPatch]
@@ -64,7 +64,7 @@ public static class ScreenshotTakePatch
     }
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
 }
 
 [HarmonyPatch]
@@ -75,16 +75,43 @@ public static class SceneDrawConstructorPatch
     static MethodBase TargetMethod() => PatchTargets.Constructor(PatchTargets.SceneDrawSystem);
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
 }
-
+// Allocates TempLDRBuffer, which receives the tonemapper output when the frame is
+// upscaled without FSR.
 [HarmonyPatch]
-public static class ExecutePostPassesPatch
+public static class UpscaleTargetFsrPatch
 {
     static bool Prepare() => RenderMode.Hdr;
 
-    static MethodBase TargetMethod() => PatchTargets.Method(PatchTargets.SceneDrawSystem, "ExecutePostPasses");
+    static MethodBase TargetMethod() => PatchTargets.Method(PatchTargets.SceneDrawSystem, "UpscaleTargetFSR");
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
-        FormatTranspiler.ReplaceFormats(instructions, original, includeUnorm: true);
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 2);
+}
+
+// Allocates TempOutputLDR, which FXAA renders into before it is copied back.
+[HarmonyPatch]
+public static class ApplyNonFsrUpscalingAndAaPatch
+{
+    static bool Prepare() => RenderMode.Hdr;
+
+    static MethodBase TargetMethod() =>
+        PatchTargets.Method(PatchTargets.SceneDrawSystem, "ApplyNonFSRUpscalingAndAA");
+
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
+}
+
+// Allocates the save game thumbnail target and CopyTextureSubresource's the final buffer into it.
+// TODO: Tonemap the screenshot?
+[HarmonyPatch]
+public static class SaveScreenshotPatch
+{
+    static bool Prepare() => RenderMode.Hdr;
+
+    static MethodBase TargetMethod() => PatchTargets.Method(PatchTargets.SceneDrawSystem, "SaveScreenshot");
+
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
+        FormatTranspiler.ReplaceFormats(instructions, original, expected: 1);
 }

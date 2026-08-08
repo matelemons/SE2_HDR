@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -14,12 +15,13 @@ internal static class FormatTranspiler
     private const sbyte Source = (sbyte)Plugin.SOURCE_FORMAT;
     private const sbyte SourceUnorm = (sbyte)Plugin.SOURCE_FORMAT_UNORM;
 
-    // limit caps how many constants are rewritten, for methods where only the first one is ours.
+    // expected is how many constants the method is known to hold. A mismatch means the game moved
+    // them elsewhere, which would leave buffers half-converted, so refuse instead of patching.
     // includeUnorm also matches the non-sRGB source format.
     public static IEnumerable<CodeInstruction> ReplaceFormats(
         IEnumerable<CodeInstruction> instructions,
         MethodBase original,
-        int limit = int.MaxValue,
+        int expected,
         bool includeUnorm = false)
     {
         var codes = new List<CodeInstruction>(instructions);
@@ -27,9 +29,6 @@ internal static class FormatTranspiler
 
         foreach (var code in codes)
         {
-            if (patched >= limit)
-                break;
-
             if (code.opcode != OpCodes.Ldc_I4_S || code.operand is not sbyte format)
                 continue;
 
@@ -40,8 +39,13 @@ internal static class FormatTranspiler
             patched++;
         }
 
-        Log.Default.WriteLine(
-            $"[{Plugin.Name}] {original?.DeclaringType?.Name}.{original?.Name}: {patched} format reference(s) patched");
+        var name = $"{original?.DeclaringType?.Name}.{original?.Name}";
+
+        if (patched != expected)
+            throw new InvalidOperationException(
+                $"{name} holds {patched} format reference(s), expected {expected}");
+
+        Log.Default.WriteLine($"[{Plugin.Name}] {name}: {patched} format reference(s) patched");
 
         return codes;
     }
