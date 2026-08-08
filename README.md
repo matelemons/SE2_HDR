@@ -20,11 +20,16 @@ Plugin last updated for SE2 `2.3.0.2798`
 # Configuring
 Click the plugin's settings button in Pulsar's plugin list:
 
-| Setting | Default | Meaning |
-|---|---|---|
-| `Enabled` | on | Controls if the plugin is enabled. |
-| `PeakNits` | 1000 | Peak luminance used in HDR tonemapping. Set it to your display's peak brightness. |
-| `UiNits` | 200 | Luminance for the UI and HUD, also known as "Paper White" brightness. |
+| Setting | Default   | Meaning                                                                                                                                                                                                |
+|---|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Enabled` | on        | Controls if the plugin is enabled.                                                                                                                                                                     |
+| `PeakNits` | 1000      | Peak luminance used in HDR tonemapping. Set it to your display's peak brightness.                                                                                                                      |
+| `PaperWhiteNits` | 200       | Luminance for the UI, HUD and the white point.                                                                                                                                                         |
+| `TonemapMode` | Hable HDR | Tonemapper to use. Multiple are available.                                                                                                                                                             |
+| `Oversaturation` | 0         | 0 keeps Rec.709 colours accurate. 1 reinterprets them as Rec.2020, stretching them across the wider gamut - not correct, but more vivid.                                                           |
+| `Dither` | on        | Dithers the output before it is quantised to 10 bits. Removes banding in smooth gradients. |
+
+Everything except `Enabled` applies immediately.
 
 
 

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
@@ -27,9 +29,7 @@ internal class DropdownAttribute : Attribute, IElement
     public Control BuildRow(string name, Func<object> getter, Action<object> setter)
     {
         var selected = getter();
-        var enumType = selected.GetType();
-        var names = Enum.GetNames(enumType);
-        var values = Enum.GetValues(enumType);
+        var options = OptionsOf(selected.GetType());
 
         var comboBox = new ComboBox
         {
@@ -38,29 +38,70 @@ internal class DropdownAttribute : Attribute, IElement
             [TextElement.FontSizeProperty] = 18d,
         };
 
-        for (var i = 0; i < names.Length; i++)
+        foreach (var option in options)
             comboBox.Items.Add(new ComboBoxItem
             {
-                Content = new TextBlock { Text = UnCamelCase(names[i]), FontSize = 18 },
-                Tag = values.GetValue(i),
+                Content = new TextBlock { Text = option.Label, FontSize = 18 },
+                Tag = option.Value,
             });
 
-        for (var i = 0; i < names.Length; i++)
+        for (var i = 0; i < options.Count; i++)
         {
-            if (Equals(values.GetValue(i), selected))
+            if (Equals(options[i].Value, selected))
             {
                 comboBox.SelectedIndex = i;
                 break;
             }
         }
 
+        Describe(options, selected);
+
         comboBox.SelectionChanged += (_, _) =>
         {
-            if (comboBox.SelectedItem is ComboBoxItem item)
-                setter(item.Tag);
+            if (comboBox.SelectedItem is not ComboBoxItem item) return;
+            setter(item.Tag);
+            Describe(options, item.Tag);
         };
 
         return RowBuilder.NewRow(Tools.Tools.GetLabelOrDefault(name, Label), Description, comboBox);
+    }
+
+    private class EnumOption
+    {
+        public object Value;
+        public string Label;
+        public int Order;
+        public string Description;
+    }
+
+    // Members without an Option keep their declared name and their numeric order.
+    private static List<EnumOption> OptionsOf(Type enumType)
+    {
+        var options = new List<EnumOption>();
+
+        var fallbackOrder = 0;
+        foreach (var memberName in Enum.GetNames(enumType))
+        {
+            var option = enumType.GetField(memberName)?.GetCustomAttribute<OptionAttribute>();
+            options.Add(new EnumOption
+            {
+                Value = Enum.Parse(enumType, memberName),
+                Label = option?.Label ?? UnCamelCase(memberName),
+                Order = option?.Order ?? fallbackOrder,
+                Description = option?.Description,
+            });
+            fallbackOrder++;
+        }
+
+        return options.OrderBy(o => o.Order).ToList();
+    }
+    
+    private static void Describe(List<EnumOption> options, object value)
+    {
+        var option = options.FirstOrDefault(o => Equals(o.Value, value));
+        if (option?.Description == null) return;
+
+        DescriptionBox.Show(option.Label, option.Description);
     }
 
     public List<Type> SupportedTypes { get; } = new() { typeof(Enum) };

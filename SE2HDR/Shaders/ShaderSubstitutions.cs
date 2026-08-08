@@ -34,12 +34,12 @@ internal sealed class ShaderSubstitutions
             {
                 SearchPattern = "#include <Common/Frame.hlsli>\r\n#include <Common/Random.hlsli>",
                 Replacement = "#include <Common/Frame.hlsli>\r\n#include <Common/Random.hlsli>\r\n"
-                              + HdrHlsl.Common + HdrHlsl.PeakNits
+                              + HdrHlsl.Common + HdrHlsl.Tonemap
             },
             new Substitution
             {
-                SearchPattern = "    color = SaturateColor(color);\r\n    ColorSRGB colorSRGB = LinearToSRGB(color);\r\n\r\n#ifdef FILL_ALPHA_LUMINANCE\r\n\tfloat alpha = GetRelativeLuminance((ColorLinear) colorSRGB.Values);\r\n\tDestination[texel] = float4(colorSRGB.Values.rgb, alpha);\r\n#else\r\n\tDestination[texel] = float4(colorSRGB.Values.rgb, 1);\r\n#endif",
-                Replacement = "    color = SaturateColor(color);\r\n\r\n    // Color sRGB? that's a lie\r\n    // OVERSATURATED\r\n    // (you can enable this if you want very vivid colors, i suppose)\r\n    //float4 colorSRGB = float4(color.Values.rgb, color.Values.a);\r\n\r\n    // CORRECT\r\n    float4 colorSRGB = float4(REC709toREC2020(color.Values.rgb), color.Values.a);\r\n    \r\n    colorSRGB = float4(ST2084Curve(colorSRGB.rgb, SE2HDR_PeakNits()), colorSRGB.a);\r\n\r\n#ifdef FILL_ALPHA_LUMINANCE\r\n\tfloat alpha = GetRelativeLuminance((ColorLinear) colorSRGB);\r\n\tDestination[texel] = float4(colorSRGB.rgb, alpha);\r\n#else\r\n\tDestination[texel] = float4(colorSRGB.rgb, 1);\r\n#endif"
+                SearchPattern = "#ifdef ENABLE_TONE_MAPPING\r\n    color.Values.rgb += GetRelativeLuminance(color).xxx * Post_.BrightDesaturation;\r\n\r\nif (Post_.EnableSmoothHable)\r\n    color = ToneMapFilmic_Hable_Smooth(color, Post_.WhitePoint);\r\nelse\r\n    color = ToneMapFilmic_Hable(color, Post_.WhitePoint);\r\n\r\n#endif\r\n    color = SaturateColor(color);\r\n    ColorSRGB colorSRGB = LinearToSRGB(color);\r\n\r\n#ifdef FILL_ALPHA_LUMINANCE\r\n\tfloat alpha = GetRelativeLuminance((ColorLinear) colorSRGB.Values);\r\n\tDestination[texel] = float4(colorSRGB.Values.rgb, alpha);\r\n#else\r\n\tDestination[texel] = float4(colorSRGB.Values.rgb, 1);\r\n#endif",
+                Replacement = "    SE2HDR_Settings se2hdr = SE2HDR_GetSettings();\r\n\r\n#ifdef ENABLE_TONE_MAPPING\r\n    color.Values.rgb += GetRelativeLuminance(color).xxx * Post_.BrightDesaturation;\r\n\r\n    color = SE2HDR_TonemapScene(color, se2hdr);\r\n#else\r\n    if (se2hdr.Mode == SE2HDR_MODE_LEGACY)\r\n        color = SaturateColor(color);\r\n#endif\r\n\r\n    float4 colorSRGB = SE2HDR_Encode(color.Values, se2hdr, texel);\r\n\r\n#ifdef FILL_ALPHA_LUMINANCE\r\n\tfloat alpha = GetRelativeLuminance((ColorLinear) colorSRGB);\r\n\tDestination[texel] = float4(colorSRGB.rgb, alpha);\r\n#else\r\n\tDestination[texel] = float4(colorSRGB.rgb, 1);\r\n#endif"
             });
 
         // UI

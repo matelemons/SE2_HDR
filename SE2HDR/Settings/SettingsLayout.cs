@@ -18,6 +18,9 @@ internal static class SettingsLayout
     // cannot grow the row past this minimum.
     public static double RowMinHeight = 52;
 
+    // Minimum height of the description panel pinned to the bottom of the dialog.
+    public static double DescriptionBoxHeight = 140;
+
     // Fixed height applied to focusable controls (TextBox, ComboBox, Button)
     // so their outer bounds do not change when the theme swaps in a thicker
     // border on focus/hover — the thicker border is drawn inside the fixed

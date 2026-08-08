@@ -12,6 +12,8 @@ internal class SettingsScreen : ScreenView
 {
     public StackPanel ContentHost { get; private set; }
     private TextBlock titleText;
+    private TextBlock descriptionTitle;
+    private TextBlock descriptionBody;
 
     public SettingsScreen()
     {
@@ -69,17 +71,48 @@ internal class SettingsScreen : ScreenView
             Margin = new Thickness(0, 16, 0, 0),
         };
 
+        descriptionTitle = new TextBlock
+        {
+            Foreground = Brushes.White,
+            FontSize = 20,
+            FontWeight = FontWeight.Bold,
+            TextWrapping = TextWrapping.Wrap,
+        };
+
+        descriptionBody = new TextBlock
+        {
+            Foreground = Brushes.White,
+            FontSize = 18,
+            TextWrapping = TextWrapping.Wrap,
+        };
+
+        var descriptionPanel = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(96, 41, 54, 62)),
+            Margin = new Thickness(0, 8, 0, 0),
+            Padding = new Thickness(12, 8, 12, 8),
+            MinHeight = SettingsLayout.DescriptionBoxHeight,
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Spacing = 4,
+                Children = { descriptionTitle, descriptionBody },
+            },
+        };
+
         var layout = new Grid
         {
             Margin = new Thickness(30),
-            RowDefinitions = new RowDefinitions("Auto,Auto,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"),
         };
         Grid.SetRow(titleBar, 0);
         Grid.SetRow(separator, 1);
         Grid.SetRow(scrollViewer, 2);
+        Grid.SetRow(descriptionPanel, 3);
         layout.Children.Add(titleBar);
         layout.Children.Add(separator);
         layout.Children.Add(scrollViewer);
+        layout.Children.Add(descriptionPanel);
 
         var border = new Border
         {
@@ -115,6 +148,7 @@ internal class SettingsScreen : ScreenView
         {
             titleText.Text = vm.Title ?? "Settings";
             ContentHost.Children.Clear();
+            DescriptionBox.Attach(descriptionTitle, descriptionBody);
             vm.BuildContent?.Invoke(ContentHost);
         }
     }

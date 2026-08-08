@@ -17,7 +17,8 @@ using SE2HDR.Tools;
 namespace SE2HDR.Patches;
 
 // The tone mapping pass binds GlobalSettings, whose PostProcessSettings block ends in an
-// unused padding int. Nothing in the engine reads it, so we make use of it to pass peak luminance.
+// unused padding int. Nothing in the engine reads it, so we make use of it to pass the packed
+// HDR settings. This runs per frame.
 [HarmonyPatch(typeof(SettingsGroup), "CreateFrameSettings")]
 public static class FrameSettingsPatch
 {
@@ -29,7 +30,7 @@ public static class FrameSettingsPatch
     static TransientConstantBuffer Create(BindableBufferManager buffers, string debugName, in FrameSettings data)
     {
         var patched = data;
-        patched.Post._padding = (int)HdrValues.PeakNits;
+        patched.Post._padding = HdrValues.PackedSettings();
         return buffers.CreateTransientConstantBuffer(debugName, in patched);
     }
 }
@@ -53,7 +54,7 @@ public static class VectorSetupPatch
 
     static void Prefix(VectorRenderer __instance)
     {
-        if (HdrValues.ConsumeUiNitsChange())
+        if (HdrValues.ConsumePaperWhiteNitsChange())
             __instance._screenResolution = NoResolution;
     }
 
@@ -65,7 +66,7 @@ public static class VectorSetupPatch
     static PersistentConstantBuffer Create(BindableBufferManager buffers, string debugName,
         ref VectorRenderer.SlugRenderSetup data, AllocationGroup allocationGroup)
     {
-        var extended = new SlugRenderSetupHdr { Base = data, UiNits = HdrValues.UiNits };
+        var extended = new SlugRenderSetupHdr { Base = data, UiNits = HdrValues.PaperWhiteNits };
         return buffers.CreatePersistentConstantBuffer(debugName, ref extended, allocationGroup);
     }
 }
@@ -91,7 +92,7 @@ public static class SpriteConstantsPatch
     static TransientConstantBuffer Create(BindableBufferManager buffers, string debugName,
         in SpriteRenderer.PixelConstantData data)
     {
-        var extended = new PixelConstantDataHdr { Base = data, UiNits = HdrValues.UiNits };
+        var extended = new PixelConstantDataHdr { Base = data, UiNits = HdrValues.PaperWhiteNits };
         return buffers.CreateTransientConstantBuffer(debugName, in extended);
     }
 }
