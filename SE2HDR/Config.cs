@@ -3,36 +3,55 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Xml.Serialization;
 using SE2HDR.Settings.Elements;
+using SE2HDR.Tools;
 
 namespace SE2HDR;
 
 
+public enum OutputMode
+{
+    [Option("Automatic", order: 0,
+        description: "Output HDR10 when Windows reports the display is in HDR mode, otherwise stay on "
+                     + "SDR and only replace the tonemapping curve.")]
+    Auto = 0,
+
+    [Option("Force HDR", order: 1,
+        description: "Always output HDR10, even when no HDR display was detected. On an SDR display it will look washed out.")]
+    ForceHdr = 1,
+
+    [Option("Force SDR", order: 2,
+        description: "Don't output HDR10. You can still adjust change tonemapping curves.")]
+    ForceSdr = 2,
+}
+
 public enum TonemapMode
 {
-    [Option("Legacy", order: 0,
+    [Option("Legacy", order: 0, sdrLabel: "Hable (original)",
         description: "Encode after the game's Hable curve and its clamp. Brighter, but since values were "
-                     + "already clamped, this just stretches the brightness. Not recommended.")]
+                     + "already clamped, this just stretches the brightness. Not recommended.",
+        sdrDescription: "The game's original curve.")]
     Legacy = 0,
 
     [Option("AgX", order: 3,
-        description: "Replace Hable with an HDR AgX curve. Changes the visual style of the game, " +
-                     "tends to give it more contrast."
-                     + " Recommended, but subjective.")]
+        description: "Replace Hable with an AgX curve. Slightly higher contrast, more muted colors. Recommended, but subjective.",
+        sdrDescription: "Replace Hable with an AgX curve. Slightly higher contrast, more muted colors.")]
     AgxHdr = 1,
-
-    [Option("Hable Extended", order: 1,
+    
+    // Not useful in SDR
+    [Option("Hable Extended", order: 1, hdrOnly: true,
         description: "Keeps original Hable, but remove the clamp. Slightly better than Legacy."
                      + " Not recommended.")]
     HableExtended = 2,
 
-    [Option("Hable HDR", order: 2,
+    // Not useful in SDR
+    [Option("Hable HDR", order: 2, hdrOnly: true,
         description: "Hable below 70% of paper white, then an HDR shoulder. "
                      + "Looks close to the original, recommended.")]
     HableHdr = 3,
 
     [Option("Uchimura GT", order: 4,
-        description: "aka the 'Gran Turismo' curve. Changes the visual style of the game somewhat."
-                     + " Recommended, but subjective.")]
+        description: "aka the 'Gran Turismo' curve. Deeper shadows, changes the visual style of the game somewhat. Recommended, but subjective.",
+        sdrDescription: "aka the 'Gran Turismo' curve. Deeper shadows, changes the visual style of the game somewhat.")]
     UchimuraGt = 4,
 }
 
@@ -41,6 +60,8 @@ public class Config : INotifyPropertyChanged
     #region Options
 
     private bool enabled = true;
+    private OutputMode outputMode = OutputMode.Auto;
+    private bool overridePeakNits;
     private int peakNits = 1000;
     private int paperWhiteNits = 200;
     private TonemapMode tonemapMode = TonemapMode.HableHdr;
@@ -54,25 +75,52 @@ public class Config : INotifyPropertyChanged
     [XmlIgnore]
     public readonly string Title = "HDR10 Plugin Settings";
 
-    [Separator("Enabling or disabling needs a game restart.")]
+    [Separator("Display")]
 
-    [Checkbox(description: "Enable HDR output. Unticking disables the plugin. Takes effect after a game restart.")]
+    [XmlIgnore]
+    [Info]
+    public string DisplayStatus => RenderMode.StatusText;
+
+    [Separator("These need a game restart to take effect.")]
+
+    [Checkbox(description: "Enable the plugin. Unticking disables the plugin. "
+                           + "Takes effect after a game restart.")]
     public bool Enabled
     {
         get => enabled;
         set => SetField(ref enabled, value);
     }
 
+    [Dropdown(description: "Whether to output HDR10 or SDR. "
+                           + "Takes effect after a game restart.")]
+    public OutputMode OutputMode
+    {
+        get => outputMode;
+        set => SetField(ref outputMode, value);
+    }
+
     [Separator("Display settings")]
-    
-    [Slider(400f, 4000f, 50f, SliderAttribute.SliderType.Integer,
-        description: "Peak luminance for tonemapping (in nits). Set it to your display's peak brightness.")]
+    [HdrOnly]
+    [Checkbox(label: "Override peak nits",
+        description: "Set the peak luminance instead of using the value reported by Windows. ")]
+    public bool OverridePeakNits
+    {
+        get => overridePeakNits;
+        set => SetField(ref overridePeakNits, value);
+    }
+
+    [HdrOnly]
+    [EnabledBy(nameof(OverridePeakNits))]
+    [Slider(400f, 2000f, 10f, SliderAttribute.SliderType.Integer,
+        description: "Peak luminance for tonemapping (in nits). Only used while the override above is "
+                     + "ticked, otherwise the reported peak is used.")]
     public int PeakNits
     {
         get => peakNits;
         set => SetField(ref peakNits, value);
     }
 
+    [HdrOnly]
     [Slider(80f, 400f, 5f, SliderAttribute.SliderType.Integer,
         description: "Luminance of the UI, HUD and of the game's own \"white\" (in nits).")]
     public int PaperWhiteNits
@@ -103,6 +151,7 @@ public class Config : INotifyPropertyChanged
         set => SetField(ref tonemapMode, value);
     }
 
+    [HdrOnly]
     [Slider(0f, 1f, 0.05f, SliderAttribute.SliderType.Float,
         description: "0 keeps Rec.709 colours accurate. 1 reinterprets them as Rec.2020, stretching "
                      + "them across the wider gamut. Not correct, but more vivid.")]
@@ -112,7 +161,7 @@ public class Config : INotifyPropertyChanged
         set => SetField(ref oversaturation, value);
     }
 
-    [Checkbox(description: "Dither the output before it is quantised to 10 bits.")]
+    [Checkbox(description: "Dither the output before it is quantised, to break up banding in gradients.")]
     public bool Dither
     {
         get => dither;

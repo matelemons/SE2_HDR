@@ -6,12 +6,15 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Vortice.DXGI;
+using SE2HDR.Tools;
 
 namespace SE2HDR.Patches;
 
 [HarmonyPatch]
 public static class SwapchainPatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     static MethodBase TargetMethod() => PatchTargets.Method(PatchTargets.SwapChain, "CreateD3DSwapChain");
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
@@ -28,7 +31,15 @@ public static class SwapchainPatch
         try
         {
             // Set HDR10 color space (BT.2020 primaries, ST.2084 EOTF/PQ curve)
-            var colorSpace = ColorSpaceType.RgbFullG2084NoneP2020;
+            const ColorSpaceType colorSpace = ColorSpaceType.RgbFullG2084NoneP2020;
+
+            if ((__result.CheckColorSpaceSupport(colorSpace) & SwapChainColorSpaceSupportFlags.Present) == 0)
+            {
+                Log.Default.WriteLine(LogSeverity.Warning,
+                    $"[{Plugin.Name}] The swapchain does not accept HDR10. The image will look washed out. "
+                    + "Enable HDR in the Windows display settings, or set the plugin's output mode to Force SDR.");
+                return;
+            }
 
             try
             {
@@ -36,8 +47,8 @@ public static class SwapchainPatch
             }
             catch (Exception e)
             {
-                Log.Default.WriteLine($"[{Plugin.Name}] WARNING: SetColorSpace1 failed: " + e);
-                Log.Default.WriteLine(
+                Log.Default.WriteLine(LogSeverity.Warning, $"[{Plugin.Name}] SetColorSpace1 failed: " + e);
+                Log.Default.WriteLine(LogSeverity.Warning,
                     $"[{Plugin.Name}] This might mean your display doesn't support HDR, or HDR is not enabled in Windows settings");
             }
         }
@@ -51,6 +62,8 @@ public static class SwapchainPatch
 [HarmonyPatch]
 public static class SwapchainResizePatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     static MethodBase TargetMethod() =>
         PatchTargets.Method(PatchTargets.SwapChain, "Resize", typeof(Vector2I));
 
@@ -61,6 +74,8 @@ public static class SwapchainResizePatch
 [HarmonyPatch]
 public static class SwapchainInitializeBackBufferPatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     static MethodBase TargetMethod() =>
         PatchTargets.Method(PatchTargets.SwapChain, "InitializeBackBufferWrappers");
 
@@ -71,6 +86,8 @@ public static class SwapchainInitializeBackBufferPatch
 [HarmonyPatch]
 public static class SwapchainConstructorPatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     static MethodBase TargetMethod() =>
         PatchTargets.Constructor(PatchTargets.SwapChain,
             typeof(RenderDisplaySettings).MakeByRefType(),

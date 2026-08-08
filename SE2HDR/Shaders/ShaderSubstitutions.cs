@@ -15,16 +15,18 @@ internal sealed class Substitution
 
 // The set of edits we make to the shader sources, and the logic to apply them.
 // Note that all substitutions are applied in-memory when the game loads the shaders.
+//
+// In SDR only the tonemapping pass is touched, other things are not necessary to change.
 internal sealed class ShaderSubstitutions
 {
     private readonly Dictionary<string, List<Substitution>> byFile;
 
-    public ShaderSubstitutions()
+    public ShaderSubstitutions(bool hdr)
     {
-        byFile = BuildSubstitutions();
+        byFile = BuildSubstitutions(hdr);
     }
 
-    private static Dictionary<string, List<Substitution>> BuildSubstitutions()
+    private static Dictionary<string, List<Substitution>> BuildSubstitutions(bool hdr)
     {
         var result = new Dictionary<string, List<Substitution>>(StringComparer.OrdinalIgnoreCase);
 
@@ -34,13 +36,16 @@ internal sealed class ShaderSubstitutions
             {
                 SearchPattern = "#include <Common/Frame.hlsli>\r\n#include <Common/Random.hlsli>",
                 Replacement = "#include <Common/Frame.hlsli>\r\n#include <Common/Random.hlsli>\r\n"
-                              + HdrHlsl.Common + HdrHlsl.Tonemap
+                              + (hdr ? HdrHlsl.Common : "") + HdrHlsl.Tonemap(hdr)
             },
             new Substitution
             {
                 SearchPattern = "#ifdef ENABLE_TONE_MAPPING\r\n    color.Values.rgb += GetRelativeLuminance(color).xxx * Post_.BrightDesaturation;\r\n\r\nif (Post_.EnableSmoothHable)\r\n    color = ToneMapFilmic_Hable_Smooth(color, Post_.WhitePoint);\r\nelse\r\n    color = ToneMapFilmic_Hable(color, Post_.WhitePoint);\r\n\r\n#endif\r\n    color = SaturateColor(color);\r\n    ColorSRGB colorSRGB = LinearToSRGB(color);\r\n\r\n#ifdef FILL_ALPHA_LUMINANCE\r\n\tfloat alpha = GetRelativeLuminance((ColorLinear) colorSRGB.Values);\r\n\tDestination[texel] = float4(colorSRGB.Values.rgb, alpha);\r\n#else\r\n\tDestination[texel] = float4(colorSRGB.Values.rgb, 1);\r\n#endif",
                 Replacement = "    SE2HDR_Settings se2hdr = SE2HDR_GetSettings();\r\n\r\n#ifdef ENABLE_TONE_MAPPING\r\n    color.Values.rgb += GetRelativeLuminance(color).xxx * Post_.BrightDesaturation;\r\n\r\n    color = SE2HDR_TonemapScene(color, se2hdr);\r\n#else\r\n    if (se2hdr.Mode == SE2HDR_MODE_LEGACY)\r\n        color = SaturateColor(color);\r\n#endif\r\n\r\n    float4 colorSRGB = SE2HDR_Encode(color.Values, se2hdr, texel);\r\n\r\n#ifdef FILL_ALPHA_LUMINANCE\r\n\tfloat alpha = GetRelativeLuminance((ColorLinear) colorSRGB);\r\n\tDestination[texel] = float4(colorSRGB.rgb, alpha);\r\n#else\r\n\tDestination[texel] = float4(colorSRGB.rgb, 1);\r\n#endif"
             });
+
+        if (!hdr)
+            return result;
 
         // UI
         foreach (var path in new[]

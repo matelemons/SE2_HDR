@@ -1,35 +1,45 @@
-# SE2 HDR10
+# SE2 Tonemapping + HDR
 
-Space Engineers 2 plugin which implements HDR10 output for the game.
+Space Engineers 2 plugin which implements HDR10 output for the game, plus a choice of alternative
+tonemapping curves that also work on an SDR display.
 
 # Disclaimer
-This plugin is under development and the amount of testing I can do is limited. In case you spot reproducible issues caused by the plugin, feel free to report them in [Issues](https://github.com/Matusson/SE2_HDR/issues).
+This plugin is under development and the amount of testing I can do is limited. In case you spot reproducible issues caused by the plugin, feel free to report them in [Issues](https://github.com/matelemons/SE2_HDR/issues).
 SE2 is being actively developed, and rendering code may change, breaking the plugin. If this happens, report it in Issues and it will be fixed.
 
-Also, do note that the plugin does not check for HDR capabilities on your system. I assume that if you're installing this, you have an HDR capable display and you have HDR enabled in Windows. **You will not see any visual improvements without an HDR display.** You should also be using a recent version of Windows 10/11.
+You should be using a recent version of Windows 10/11.
 
 Plugin last updated for SE2 `2.3.0.2798`
 
 
+# HDR and SDR
+On startup the plugin checks if you have an HDR-capable display and automatically selects the correct mode. 
+
+In SDR mode, the plugin is limited to only modifying the tonemapping curve (AgX / Uchimura GT).
+In HDR mode, the plugin patches code related to the game's output buffers to make them 10-bit. In addition to tonemapping curves (AgX / Uchimura GT / modified HDR Hable), color transformations and PQ encoding are added. HDR parameters are auto-detected from your display's capabilities.
+
+
 # Installing
 1. Install [Pulsar](https://github.com/SpaceGT/Pulsar)
-2. Open the plugin list, find **HDR10**, enable it.
-3. Restart the game. The output should be in HDR.
+2. Open the plugin list, find **Tonemapping + HDR**, enable it.
+3. Restart the game.
 
 
 # Configuring
 Click the plugin's settings button in Pulsar's plugin list:
 
-| Setting | Default   | Meaning                                                                                                                                                                                                |
-|---|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Enabled` | on        | Controls if the plugin is enabled.                                                                                                                                                                     |
-| `PeakNits` | 1000      | Peak luminance used in HDR tonemapping. Set it to your display's peak brightness.                                                                                                                      |
-| `PaperWhiteNits` | 200       | Luminance for the UI, HUD and the white point.                                                                                                                                                         |
-| `TonemapMode` | Hable HDR | Tonemapper to use. Multiple are available.                                                                                                                                                             |
-| `Oversaturation` | 0         | 0 keeps Rec.709 colours accurate. 1 reinterprets them as Rec.2020, stretching them across the wider gamut - not correct, but more vivid.                                                           |
-| `Dither` | on        | Dithers the output before it is quantised to 10 bits. Removes banding in smooth gradients. |
+| Setting | Default   | Meaning                                                                                                                                 |
+|---|-----------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| `Enabled` | on        | Controls if the plugin is enabled.                                                                                                      |
+| `OutputMode` | Automatic | Whether to output HDR10. `Automatic` is based on display support, `Force HDR` and `Force SDR` override it.                                      |
+| `Override peak nits` | off       | HDR only. Sets the peak luminance from the slider below instead of from what the display reports.                                       |
+| `PeakNits` | 1000      | HDR only. Peak luminance used in tonemapping. Only used while the override is ticked.                                    |
+| `PaperWhiteNits` | 200       | HDR only. Luminance for the UI, HUD and the white point.                                                                                |
+| `TonemapMode` | Hable HDR | Tonemapper to use. Multiple are available.                                                                                              |
+| `Oversaturation` | 0         | HDR only. 0 keeps Rec.709 colours accurate. 1 reinterprets them as Rec.2020, stretching them across the wider gamut - not correct, but more vivid. |
+| `Dither` | on        | Dithers the output before it is quantised. Removes banding in smooth gradients.                                                         |
 
-Everything except `Enabled` applies immediately.
+Everything except `Enabled` and `OutputMode` applies immediately.
 
 
 
@@ -40,7 +50,9 @@ This plugin has two components:
 1. Code patches use Harmony. Most of these patches are around the swapchain methods and a bit of drawing code. Most of them simply swap the requested format to an HDR one.
 2. Shader patches use string substitution on the shader source, applied in memory. The tonemapping shader gets a Rec709 -> Rec2020 conversion and a PQ curve. Multiple UI shaders are also modified, since UI is drawn after tonemapping. This is not ideal, but it does seem to work.
 
+In SDR neither of those is needed beyond the tonemapping shader itself. Every format patch is  skipped, and so are the UI shader edits. The tonemapping curves are shared between the two modes.
+
 Config values are adjustable at runtime by injecting the extra values to existing buffers. Tonemapping uses an unusued padding int, while Slug shaders get widened by one float4.
 This plugin might not be compatible with other plugins that modify rendering in a similar way.
 
-Note that all rendering and assets are in Rec709 color space, as far as I'm aware. This means it's not possible to (easily) get accurate wide gamut output. You can only get the benefits of 10-bit signal, higher highlight details and the increased brightness range with this plugin. The differences are likely to be most noticeable on a MiniLED display rather than OLED.
+Note that all rendering and assets in the game are in Rec709 color space, as far as I'm aware. This means it's not possible to (easily) get accurate wide gamut output. You can only get the benefits of 10-bit signal, more highlight details and the increased brightness range with this plugin.

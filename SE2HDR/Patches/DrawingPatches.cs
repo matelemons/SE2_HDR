@@ -3,12 +3,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using SE2HDR.Tools;
 
 namespace SE2HDR.Patches;
 
 [HarmonyPatch]
 public static class PsoFormatArrayPatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     // InitializeAsync is an async method, so we need to patch the compiler-generated
     // state machine's MoveNext rather than the method itself.
     static MethodBase TargetMethod()
@@ -30,6 +33,8 @@ public static class PsoFormatArrayPatch
 [HarmonyPatch]
 public static class ScreenshotConstructorPatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     static MethodBase TargetMethod() =>
         PatchTargets.Constructor(PatchTargets.ScreenshotsManager,
             typeof(List<Keen.VRage.Library.Threading.Task>));
@@ -41,6 +46,8 @@ public static class ScreenshotConstructorPatch
 [HarmonyPatch]
 public static class ScreenshotTakePatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     // TakeRequestedScreenshots is generic and each instantiation gets its own IL, so both
     // texture types the game uses have to be patched separately.
     static IEnumerable<MethodBase> TargetMethods()
@@ -63,6 +70,8 @@ public static class ScreenshotTakePatch
 [HarmonyPatch]
 public static class SceneDrawConstructorPatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     static MethodBase TargetMethod() => PatchTargets.Constructor(PatchTargets.SceneDrawSystem);
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>
@@ -72,6 +81,8 @@ public static class SceneDrawConstructorPatch
 [HarmonyPatch]
 public static class ExecutePostPassesPatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     static MethodBase TargetMethod() => PatchTargets.Method(PatchTargets.SceneDrawSystem, "ExecutePostPasses");
 
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original) =>

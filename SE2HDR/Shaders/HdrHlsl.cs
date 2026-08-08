@@ -43,7 +43,12 @@ float4 ToHdr(float4 col, float maxLuminance)
 
     // Tone mapping runs in a pass that binds the engine's GlobalSettings buffer, so our settings
     // are stored in an unused padding slot at the end of PostProcessSettings.
-    public const string Tonemap = @"
+    //
+    // The curves are compatible with both SDR and HDR.
+    public static string Tonemap(bool hdr) =>
+        $"\r\n#define SE2HDR_HDR_OUTPUT {(hdr ? 1 : 0)}\r\n" + TonemapBody;
+
+    private const string TonemapBody = @"
 #define SE2HDR_MODE_LEGACY 0
 #define SE2HDR_MODE_AGX 1
 #define SE2HDR_MODE_HABLE_EXTENDED 2
@@ -82,10 +87,16 @@ SE2HDR_Settings SE2HDR_GetSettings()
 
     s.MasterNits = max(SE2HDR_REFERENCE_NITS, s.PeakNits);
 
-    // How far above paper white a curve is allowed to go
+    // How far above paper white a curve is allowed to go.
+#if SE2HDR_HDR_OUTPUT
     s.OutputMax = max(s.MasterNits / s.UiNits, 1.0);
+#else
+    s.OutputMax = 1.0;
+#endif
     return s;
 }
+
+#if SE2HDR_HDR_OUTPUT
 
 float3 SE2HDR_PqFromNits(float3 nits)
 {
@@ -143,6 +154,8 @@ float3 SE2HDR_DisplayMap(float3 x, SE2HDR_Settings s)
     return SE2HDR_Bt2390(x * s.UiNits, s.MasterNits, s.PeakNits) / s.UiNits;
 }
 
+#endif // SE2HDR_HDR_OUTPUT
+
 float3 SE2HDR_Shoulder(float3 x, float crossover, float value, float slope, float outMax, float highClip)
 {
     float shoulderMax = max(outMax - value, 1e-4);
@@ -171,30 +184,6 @@ float3 SE2HDR_AllenWpCurve(float3 x, float outputMax)
     t = t / (t + toeA);
 
     return lerp(s, t, (float3) (x < crossover));
-}
-
-float3 SE2HDR_TonemapAgx(float3 color, float outputMax)
-{
-    // Rec.709 to Rec.2020 with the Blender AgX inset matrix, and the inverse outset
-    // with Rec.2020 back to Rec.709.
-    const float3x3 insetMatrix = float3x3(
-        0.544814746488245, 0.373787398372697, 0.0813978551390581,
-        0.140416948464053, 0.754137554567394, 0.105445496968552,
-        0.0888104196149096, 0.178871756420858, 0.732317823964232
-    );
-
-    const float3x3 outsetMatrix = float3x3(
-        1.96488741169489, -0.855988495690215, -0.108898916004672,
-        -0.299313364904742, 1.32639796461980, -0.0270845997150571,
-        -0.164352742528393, -0.238183969428088, 1.40253671195648
-    );
-
-    color = mul(insetMatrix, max(color, 0.0));
-    color = SE2HDR_AllenWpCurve(color, outputMax);
-
-    color = min(color, outputMax);
-
-    return mul(outsetMatrix, color);
 }
 
 #define SE2HDR_HABLE_A 0.15
@@ -234,6 +223,16 @@ float SE2HDR_HableInverse(float y, float whiteScale)
     float qb = SE2HDR_HABLE_B * (SE2HDR_HABLE_C - u);
     float qc = SE2HDR_HABLE_D * (SE2HDR_HABLE_E - u * SE2HDR_HABLE_F);
     return (-qb + sqrt(max(qb * qb - 4.0 * qa * qc, 0.0))) / (2.0 * max(qa, 1e-5));
+}
+
+// Scene-referred curves assume an input scale where diffuse white sits around 1.0. Keen's Hable
+// is normalised against WhitePoint, which puts diffuse white nearer 0.3.
+float SE2HDR_SceneGain(float whitePoint)
+{
+    const float anchor = 0.25;
+
+    float whiteScale = 1.0 / SE2HDR_HableRaw(max(whitePoint, 0.5));
+    return anchor / max(SE2HDR_HableInverse(anchor, whiteScale), 1e-4);
 }
 
 // Keen's Hable below the knee, an outputMax-aware shoulder above it.
@@ -284,25 +283,43 @@ float3 SE2HDR_Uchimura(float3 x, float P)
     return T * w0 + L * w1 + S * w2;
 }
 
-// The GT curve assumes an input scale where diffuse white is around 1.0. Hable normalised
-// against WhitePoint ends up with diffuse white around ~0.3. We pre-scale the input to fix that.
-//
-// This also means our `m` section in SE2HDR_Uchimura is lower than standard to compensate for this.
+// See SE2HDR_SceneGain. This also means our `m` section in SE2HDR_Uchimura is lower than
+// standard to compensate for the rescaled input.
 float3 SE2HDR_UchimuraHdr(float3 x, float whitePoint, float outputMax)
 {
-    const float anchor = 0.25;
+    return min(SE2HDR_Uchimura(x * SE2HDR_SceneGain(whitePoint), outputMax), outputMax);
+}
 
-    float whiteScale = 1.0 / SE2HDR_HableRaw(max(whitePoint, 0.5));
-    float gain = anchor / max(SE2HDR_HableInverse(anchor, whiteScale), 1e-4);
+float3 SE2HDR_TonemapAgx(float3 color, float whitePoint, float outputMax)
+{
+    // Rec.709 to Rec.2020 with the Blender AgX inset matrix, and the inverse outset
+    // with Rec.2020 back to Rec.709.
+    const float3x3 insetMatrix = float3x3(
+        0.544814746488245, 0.373787398372697, 0.0813978551390581,
+        0.140416948464053, 0.754137554567394, 0.105445496968552,
+        0.0888104196149096, 0.178871756420858, 0.732317823964232
+    );
 
-    return min(SE2HDR_Uchimura(x * gain, outputMax), outputMax);
+    const float3x3 outsetMatrix = float3x3(
+        1.96488741169489, -0.855988495690215, -0.108898916004672,
+        -0.299313364904742, 1.32639796461980, -0.0270845997150571,
+        -0.164352742528393, -0.238183969428088, 1.40253671195648
+    );
+
+    // AgX is scene-referred just like the GT curve, so it needs the same rescale.
+    color = mul(insetMatrix, max(color, 0.0) * SE2HDR_SceneGain(whitePoint));
+    color = SE2HDR_AllenWpCurve(color, outputMax);
+
+    color = min(color, outputMax);
+
+    return mul(outsetMatrix, color);
 }
 
 ColorLinear SE2HDR_TonemapScene(ColorLinear color, SE2HDR_Settings s)
 {
     if (s.Mode == SE2HDR_MODE_AGX)
     {
-        color.Values.rgb = SE2HDR_TonemapAgx(color.Values.rgb, s.OutputMax);
+        color.Values.rgb = SE2HDR_TonemapAgx(color.Values.rgb, Post_.WhitePoint, s.OutputMax);
     }
     else if (s.Mode == SE2HDR_MODE_HABLE_HDR)
     {
@@ -332,7 +349,7 @@ ColorLinear SE2HDR_TonemapScene(ColorLinear color, SE2HDR_Settings s)
     return color;
 }
 
-float3 SE2HDR_Dither(float3 pq, uint2 texel)
+float3 SE2HDR_Dither(float3 encoded, uint2 texel, float levels)
 {
     uint h1 = HashMix(texel.x * 73856093u ^ texel.y * 19349663u);
     uint h2 = HashMix(h1 ^ 0x9e3779b9u);
@@ -340,8 +357,10 @@ float3 SE2HDR_Dither(float3 pq, uint2 texel)
     uint3 a = uint3(h1, h1 >> 10, h1 >> 20) & 0x3FFu;
     uint3 b = uint3(h2, h2 >> 10, h2 >> 20) & 0x3FFu;
 
-    return pq + (float3(a) - float3(b)) / (1023.0 * 1023.0);
+    return encoded + (float3(a) - float3(b)) / (1023.0 * levels);
 }
+
+#if SE2HDR_HDR_OUTPUT
 
 float4 SE2HDR_Encode(float4 values, SE2HDR_Settings s, uint2 texel)
 {
@@ -361,10 +380,25 @@ float4 SE2HDR_Encode(float4 values, SE2HDR_Settings s, uint2 texel)
     float3 pq = ST2084Curve(rgb, referenceNits);
 
     if (s.Dither)
-        pq = SE2HDR_Dither(pq, texel);
+        pq = SE2HDR_Dither(pq, texel, 1023.0);
 
     return float4(pq, values.a);
-}";
+}
+
+#else
+
+float4 SE2HDR_Encode(float4 values, SE2HDR_Settings s, uint2 texel)
+{
+    ColorLinear linearColor = (ColorLinear) float4(saturate(values.rgb), values.a);
+    float3 srgb = LinearToSRGB(linearColor).Values.rgb;
+
+    if (s.Dither)
+        srgb = SE2HDR_Dither(srgb, texel, 255.0);
+
+    return float4(srgb, values.a);
+}
+
+#endif";
 
     // The Slug pipelines bind nothing but their own setup buffer, so we extend it.
     // The declaration below must mirror SlugRenderSetupHdr and the

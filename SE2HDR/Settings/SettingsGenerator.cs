@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -14,6 +15,7 @@ internal class AttributeInfo
     public string Name;
     public Func<object> Getter;
     public Action<object> Setter;
+    public string EnabledBy;
 }
 
 internal class SettingsGenerator
@@ -31,7 +33,33 @@ internal class SettingsGenerator
     {
         host.Children.Clear();
         foreach (var info in attributes)
-            host.Children.Add(info.ElementType.BuildRow(info.Name, info.Getter, info.Setter));
+        {
+            var row = info.ElementType.BuildRow(info.Name, info.Getter, info.Setter);
+            BindEnabled(row, info.EnabledBy);
+            host.Children.Add(row);
+        }
+    }
+    
+    private static void BindEnabled(Control row, string propertyName)
+    {
+        if (propertyName == null)
+            return;
+
+        var property = typeof(Config).GetProperty(propertyName)
+                       ?? throw new Exception($"EnabledBy target {propertyName} not found on Config");
+
+        void Update() => row.IsEnabled = property.GetValue(Config.Current) as bool? ?? true;
+
+        void OnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            if (args.PropertyName == propertyName)
+                Update();
+        }
+
+        Update();
+        Config.Current.PropertyChanged += OnPropertyChanged;
+        
+        row.DetachedFromVisualTree += (_, _) => Config.Current.PropertyChanged -= OnPropertyChanged;
     }
 
     private static bool ValidateType(Type type, List<Type> typesList) =>
@@ -50,6 +78,9 @@ internal class SettingsGenerator
 
         foreach (var propertyInfo in typeof(Config).GetProperties())
         {
+            if (!SE2HDR.Tools.RenderMode.Hdr && propertyInfo.IsDefined(typeof(HdrOnlyAttribute), false))
+                continue;
+
             var name = propertyInfo.Name;
             foreach (var attribute in propertyInfo.GetCustomAttributes())
             {
@@ -69,6 +100,7 @@ internal class SettingsGenerator
                     Name = name,
                     Getter = () => propertyInfo.GetValue(Config.Current),
                     Setter = value => propertyInfo.SetValue(Config.Current, value),
+                    EnabledBy = propertyInfo.GetCustomAttribute<EnabledByAttribute>()?.PropertyName,
                 };
                 config.Add(info);
             }

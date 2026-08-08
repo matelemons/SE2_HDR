@@ -4,6 +4,7 @@ using HarmonyLib;
 using Keen.VRage.Core.Plugins;
 using Keen.VRage.Library.Diagnostics;
 using SE2HDR.Settings;
+using SE2HDR.Settings.Elements;
 using SE2HDR.Shaders;
 using SE2HDR.Tools;
 using Vortice.DXGI;
@@ -41,20 +42,26 @@ public class Plugin : IPlugin
         Harmony.DEBUG = true;
 #endif
 
+        // Decides HDR vs SDR for the rest of startup
+        RenderMode.Resolve();
+        CoerceTonemapMode();
+
         if (!Config.Current.Enabled)
         {
             Log.Default.WriteLine($"[{Name}] Disabled in the plugin settings.");
             return;
         }
 
+        var output = RenderMode.Hdr ? "HDR" : "SDR";
+
         // Confirm the shader edits will apply before touching anything.
-        var substitutions = new ShaderSubstitutions();
+        var substitutions = new ShaderSubstitutions(RenderMode.Hdr);
         if (!substitutions.Validate())
         {
             Log.Default.WriteLine(LogSeverity.Error,
-                $"[{Name}] Shader validation failed, no render patches applied. HDR has not been enabled.");
+                $"[{Name}] Shader validation failed, no render patches applied.");
             FailureNotice.Queue(
-                "Shaders are different than expected. To avoid rendering problems, HDR has not been enabled.\n\n" +
+                "Shaders are different than expected. To avoid rendering problems, the plugin has been disabled.\n\n" +
                 $"This is likely due to a game update. Please inform the {Name} plugin developer on GitHub.\n\n" +
                 "Disable the plugin to stop showing this message.");
             return;
@@ -70,20 +77,32 @@ public class Plugin : IPlugin
         catch (Exception ex)
         {
             // Undo patches if anything fails
-            Log.Default.WriteLine(LogSeverity.Error, $"[{Name}] Patching failed, reverting. HDR has not been enabled. {ex}");
+            Log.Default.WriteLine(LogSeverity.Error, $"[{Name}] Patching failed, reverting. {ex}");
             harmony.UnpatchAll(Name);
             Substitutions = null;
             FailureNotice.Queue(
-                "Applying the render patches failed, and HDR has not been enabled:\n\n" +
+                "Applying the render patches failed, and the plugin has been disabled:\n\n" +
                 $"{ex.GetType().Name}: {ex.Message}\n\n" +
                 $"This is likely due to a game update. Please inform the {Name} plugin developer on GitHub.\n\n" +
                 "Disable the plugin to stop showing this message.");
             return;
         }
 
-        Log.Default.WriteLine($"[{Name}] Applied patches:");
+        Log.Default.WriteLine($"[{Name}] Applied patches for {output} output:");
         foreach (var method in harmony.GetPatchedMethods())
             Log.Default.WriteLine($"[{Name}]   - {method.DeclaringType?.Name}.{method.Name}");
+    }
+
+    // A config carried over from an HDR session can still select a tonemapper the SDR dropdown
+    // does not list. Fall back rather than leaving an invalid value. The file is not modified.
+    private static void CoerceTonemapMode()
+    {
+        if (RenderMode.Hdr || OptionAttribute.Of(Config.Current.TonemapMode)?.HdrOnly != true)
+            return;
+        
+        Log.Default.WriteLine(
+            $"[{Name}] {Config.Current.TonemapMode} is HDR-only, using {TonemapMode.Legacy} for SDR output.");
+        Config.Current.TonemapMode = TonemapMode.Legacy;
     }
 
     // Invoked by Pulsar via reflection when the user clicks the plugin's config button.

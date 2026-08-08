@@ -4,7 +4,17 @@ namespace SE2HDR.Tools;
 
 internal static class HdrValues
 {
-    public static float PeakNits => Config.Current.PeakNits;
+    // The display's reported peak unless the user has overriden it.
+    public static int PeakNits
+    {
+        get
+        {
+            if (Config.Current.OverridePeakNits)
+                return Config.Current.PeakNits;
+
+            return RenderMode.DetectedPeakNits > 0 ? RenderMode.DetectedPeakNits : RenderMode.DefaultPeakNits;
+        }
+    }
 
     public static float PaperWhiteNits => Config.Current.PaperWhiteNits;
 
@@ -23,7 +33,7 @@ internal static class HdrValues
     {
         var config = Config.Current;
 
-        var peak = (uint)Math.Clamp(config.PeakNits, 0, 4095);
+        var peak = (uint)Math.Clamp(PeakNits, 0, 4095);
         var ui = (uint)Math.Clamp(config.PaperWhiteNits, 0, 511);
         var oversaturation = (uint)Math.Clamp((int)MathF.Round(config.Oversaturation * 63f), 0, 63);
         var dither = config.Dither ? 1u : 0u;

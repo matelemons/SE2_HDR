@@ -75,20 +75,28 @@ internal class DropdownAttribute : Attribute, IElement
     }
 
     // Members without an Option keep their declared name and their numeric order.
+    // HdrOnly members are dropped in SDR mode
     private static List<EnumOption> OptionsOf(Type enumType)
     {
+        var hdr = SE2HDR.Tools.RenderMode.Hdr;
         var options = new List<EnumOption>();
 
         var fallbackOrder = 0;
         foreach (var memberName in Enum.GetNames(enumType))
         {
             var option = enumType.GetField(memberName)?.GetCustomAttribute<OptionAttribute>();
+            if (option != null && option.HdrOnly && !hdr)
+            {
+                fallbackOrder++;
+                continue;
+            }
+
             options.Add(new EnumOption
             {
                 Value = Enum.Parse(enumType, memberName),
-                Label = option?.Label ?? UnCamelCase(memberName),
+                Label = option?.LabelFor(hdr) ?? UnCamelCase(memberName),
                 Order = option?.Order ?? fallbackOrder,
-                Description = option?.Description,
+                Description = option?.DescriptionFor(hdr),
             });
             fallbackOrder++;
         }

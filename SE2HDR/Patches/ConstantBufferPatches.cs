@@ -42,6 +42,8 @@ public static class FrameSettingsPatch
 [HarmonyPatch(typeof(VectorRenderer), "GetScreenSetup")]
 public static class VectorSetupPatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     private struct SlugRenderSetupHdr
     {
@@ -76,6 +78,8 @@ public static class VectorSetupPatch
 [HarmonyPatch(typeof(SpriteRenderer), "Draw")]
 public static class SpriteConstantsPatch
 {
+    static bool Prepare() => RenderMode.Hdr;
+
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     private struct PixelConstantDataHdr
     {

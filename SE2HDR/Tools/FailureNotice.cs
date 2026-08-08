@@ -52,7 +52,7 @@ internal static class FailureNotice
                 return;
 
             var definition = new OneOptionDialogDefinition();
-            SetLocKey(definition, "Title", $"HDR patch failed");
+            SetLocKey(definition, "Title", $"{Plugin.Name} patch failed");
             SetLocKey(definition, "Content", message);
             SetLocKey(definition, "ConfirmOption", "Ok");
 
