@@ -1,4 +1,7 @@
 <Project>
+  <!-- Not auto-imported by name; Pulsar ignores it entirely, so keep SE2HDR/AssemblyInfo.cs in sync. -->
+  <Import Project="Version.Build.props" />
+
   <PropertyGroup>
     <!-- Folder containing SpaceEngineers2.exe. -->
     <SteamAppInstall>$(registry:HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 1133870@InstallLocation)</SteamAppInstall>
@@ -13,11 +16,6 @@
 
     <!-- Local plugin DLL deployment folder -->
     <LocalDeploymentDir>$(Pulsar)/Modern/Local</LocalDeploymentDir>
-
-    <!-- Plugin version -->
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
   </PropertyGroup>
 
   <Target Name="VerifyGamePath" BeforeTargets="BeforeBuild" Condition="!Exists('$(Game2)')">
